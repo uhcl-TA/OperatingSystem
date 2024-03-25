@@ -1,0 +1,123 @@
+
+        if (systemCallNumber == 1) {
+            char fifoName[MAX_BUFFER_SIZE];
+            memcpy(fifoName, buffer + 4 * sizeof(int), parameterSize);
+            fifoName[parameterSize] = '\0';
+
+            int clientFifo = open(fifoName, O_WRONLY);
+            if (clientFifo == -1) {
+                printf("Error opening client fifo\n");
+                continue;
+            }
+
+            clients[numClients].pid = processIDCounter;
+            clients[numClients].fd = clientFifo;
+            strcpy(clients[numClients].fifo_name, fifoName);
+            numClients++;
+
+            int nextProcessID = processIDCounter;
+            processIDCounter++;
+
+            write(clientFifo, &nextProcessID, sizeof(int));
+        } else if (systemCallNumber == 2) {
+            int parameter;
+            memcpy(&parameter, buffer + 4 * sizeof(int), parameterSize);
+
+            printf("Param1=%d\n", parameter);
+            printf("Result=%d\n", parameter);
+
+            int clientFifo = -1;
+            for (int i = 0; i < numClients; i++) {
+                if (clients[i].pid == pid) {
+                    clientFifo = clients[i].fd;
+                    break;
+                }
+            }
+
+            if (clientFifo != -1) {
+                write(clientFifo, &parameter, sizeof(int));
+            }
+        } else if (systemCallNumber == 3) {
+            char parameter[MAX_BUFFER_SIZE];
+            memcpy(parameter, buffer + 4 * sizeof(int), parameterSize);
+            parameter[parameterSize] = '\0';
+
+            printf("Param1=%s\n", parameter);
+            printf("Result=%s\n", parameter);
+
+            int clientFifo = -1;
+            for (int i = 0; i < numClients; i++) {
+                if (clients[i].pid == pid) {
+                    clientFifo = clients[i].fd;
+                    break;
+                }
+            }
+
+            if (clientFifo != -1) {
+                write(clientFifo, parameter, strlen(parameter) + 1);
+            }
+        } else if (systemCallNumber == 4) {
+            int parameter;
+            memcpy(&parameter, buffer + 4 * sizeof(int), parameterSize);
+
+            printf("Param1=%d\n", parameter);
+            printf("Result=%d\n", parameter);
+
+            int clientFifo = -1;
+            for (int i = 0; i < numClients; i++) {
+                if (clients[i].pid == pid) {
+                    clientFifo = clients[i].fd;
+                    break;
+                }
+            }
+
+            if (clientFifo != -1) {
+                write(clientFifo, &parameter, sizeof(int));
+            }
+        } else if (systemCallNumber == 5) {
+            printf("Result=Recalled Value\n");
+
+            int clientFifo = -1;
+            for (int i = 0; i < numClients; i++) {
+                if (clients[i].pid == pid) {
+                    clientFifo = clients[i].fd;
+                    break;
+                }
+            }
+
+            if (clientFifo != -1) {
+                int parameter = 42; // Replace with actual stored value
+                write(clientFifo, &parameter, sizeof(int));
+            }
+        } else if (systemCallNumber == 0) {
+            printf("System Call Requested: EXIT\n");
+
+            int clientFifo = -1;
+            for (int i = 0; i < numClients; i++) {
+                if (clients[i].pid == pid) {
+                    clientFifo = clients[i].fd;
+                    close(clientFifo);
+                    break;
+                }
+            }
+
+            if (clientFifo != -1) {
+                for (int i = 0; i < numClients; i++) {
+                    if (clients[i].pid == pid) {
+                        for (int j = i; j < numClients - 1; j++) {
+                            clients[j] = clients[j + 1];
+                        }
+                        numClients--;
+                        break;
+                    }
+                }
+            }
+        } else if (systemCallNumber == -1) {
+            printf("System Call Requested: SHUTDOWN\n");
+
+            for (int i = 0; i < numClients; i++) {
+                close(clients[i].fd);
+            }
+
+            break;
+        }
