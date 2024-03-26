@@ -13,7 +13,7 @@ int processID;
 
 int main(int argc, char *argv[]) {
     if (argc != 2) {
-        printf("Usage: %s <client_name>\n", argv[0]);
+        printf("Usage: %s <client_number>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
@@ -22,7 +22,8 @@ int main(int argc, char *argv[]) {
 
     // Create client FIFO
     printf("Creating client fifo \n");
-    sprintf(client_fifo, "./fifos/%s_fifo", argv[1]);
+    sprintf(client_fifo, "./fifos/client%sfifo", argv[1]);
+    printf("creating client fifo %s \n", client_fifo);
     mkfifo(client_fifo, 0666);
 
     // Open server FIFO for writing
@@ -33,16 +34,16 @@ int main(int argc, char *argv[]) {
     }
 
     // Connect to server
-    // char connect_message[50];
-    // sprintf(connect_message, "CONNECT ./fifos/%s", argv[1]);
-    // write(server_fd, connect_message, strlen(connect_message) + 1);
+    char connect_message[50];
+    sprintf(connect_message, "CONNECT ./fifos/%s", argv[1]);
+    write(server_fd, connect_message, strlen(connect_message) + 1);
 
     // Open client FIFO for reading
-    // int client_fd = open(client_fifo, O_RDONLY);
+    int client_fd = open(client_fifo, O_RDONLY);
 
     // Read welcome message from server
-    // read(client_fd, server_message, sizeof(server_message));
-    // printf("Server: %s\n", server_message);
+    read(client_fd, server_message, sizeof(server_message));
+    printf("Server: %s\n", server_message);
 
     // Main client loop
     while(1) {
@@ -71,30 +72,38 @@ int main(int argc, char *argv[]) {
 
             // Format system call request
             char request[MAX_MESSAGE_SIZE];
-            sprintf(request, "%d,%d,%d,%d,%s", processID, systemCallNumber, parameterCount, strlen(parameters), parameters);
+            sprintf(request, "%d,%d,%d,%d,%s \n", processID, systemCallNumber, parameterCount, strlen(parameters), parameters);
+            // Send message to server
+            write(server_fd, request, strlen(request) + 1);
 
-            printf("%s \n", request);
+            read(client_fd, server_message, sizeof(server_message));
+            if (systemCallNumber == 1) {
+              // Save the PID
+              printf("process ID is %s \n", server_message);
+              processID = atoi(strtok(server_message, ","));
+              printf("saved PID %d \n", processID);
+            } else {
+              printf("%s \n", server_message);
+            }   
         } else if (choice == 2) {
           // Exit
+          close(client_fd);
+          // Remove client FIFO
+          unlink(client_fifo);
+          return 0;
         } else if (choice == 3) {
           // Shutdown
+          char SHUT_DOWN_MESSAGE[50];
+          sprintf(SHUT_DOWN_MESSAGE, "SHUTDOWN");
+          write(server_fd, SHUT_DOWN_MESSAGE, strlen(SHUT_DOWN_MESSAGE) + 1);
+          // Close FIFOs
+          close(server_fd);
+          close(client_fd);
+
+          // Remove client FIFO
+          unlink(client_fifo);
+          return 0;
         }
-
-
-        // printf("Enter message: ");
-        // fgets(server_message, sizeof(server_message), stdin);
-
-        // // Send message to server
-        // write(server_fd, server_message, strlen(server_message) + 1);
-
-        // // Check for exit command
-        // if (strncmp(server_message, "exit", 4) == 0) {
-        //     break;
-        // }
-
-        // // Read server response
-        // read(client_fd, server_message, sizeof(server_message));
-        // printf("Server: %s\n", server_message);
     }
 
     // Close FIFOs
